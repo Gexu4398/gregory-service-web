@@ -1,7 +1,5 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
-import Cookies from 'js-cookie'
-import router from '@/router'
 
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
@@ -15,8 +13,8 @@ const request: AxiosInstance = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 添加认证 token
-    const token = Cookies.get('access_token')
+    // 从localStorage获取认证 token
+    const token = localStorage.getItem('auth_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -32,18 +30,35 @@ request.interceptors.response.use(
   (response: AxiosResponse) => {
     return response
   },
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     // 处理错误响应
     if (error.response) {
       const { status, data } = error.response as any
       
       switch (status) {
         case 401:
-          // 未授权，清除 token 并跳转到登录页
-          Cookies.remove('access_token')
-          Cookies.remove('refresh_token')
-          ElMessage.error('登录已过期，请重新登录')
-          router.push('/login')
+          // 检查是否有token
+          const token = localStorage.getItem('auth_token')
+          if (token) {
+            // 有token但401，说明token过期或无效
+            ElMessage.error('登录已过期，请重新登录')
+            // 清除认证信息
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('user_info')
+            localStorage.removeItem('user_permissions')
+            localStorage.removeItem('user_roles')
+            // 动态导入auth store避免循环依赖
+            const { useAuthStore } = await import('@/stores/auth')
+            const authStore = useAuthStore()
+            authStore.redirectToLogin()
+          } else {
+            // 没有token，说明未登录或权限不足
+            ElMessage.error('权限不足，请先登录')
+            const { useAuthStore } = await import('@/stores/auth')
+            const authStore = useAuthStore()
+            authStore.redirectToLogin()
+          }
           break
         case 403:
           ElMessage.error('没有权限访问该资源')
