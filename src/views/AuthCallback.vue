@@ -28,31 +28,26 @@ onMounted(async () => {
     // 检查是否有错误
     if (error) {
       ElMessage.error(error_description as string || '认证失败')
-      router.push('/login')
+      authStore.redirectToLogin()
       return
     }
     
     // 检查必要参数
     if (!code || !state) {
       ElMessage.error('缺少必要的认证参数')
-      router.push('/login')
+      authStore.redirectToLogin()
       return
     }
     
     // 处理授权码
-    const success = await authStore.handleAuthCallback(code as string, state as string)
+    const redirectPath = await authStore.handleAuthCallback(code as string, state as string)
     
-    if (success) {
-      // 登录成功，跳转到首页或原来要访问的页面
-      const redirect = route.query.redirect as string || '/'
-      router.push(redirect)
-    } else {
-      router.push('/login')
-    }
+    // 登录成功，跳转到指定页面
+    router.push(redirectPath)
   } catch (error) {
     console.error('处理认证回调失败:', error)
     ElMessage.error('登录失败，请重试')
-    router.push('/login')
+    authStore.redirectToLogin()
   }
 })
 </script>

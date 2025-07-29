@@ -6,15 +6,6 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      path: '/login',
-      name: 'Login',
-      component: () => import('@/views/Login.vue'),
-      meta: {
-        title: '登录',
-        requiresAuth: false,
-      },
-    },
-    {
       path: '/auth/callback',
       name: 'AuthCallback',
       component: () => import('@/views/AuthCallback.vue'),
@@ -183,20 +174,15 @@ router.beforeEach(async (to, from, next) => {
     if (!authStore.isAuthenticated) {
       // 保存原始路径用于登录后重定向
       const redirect = to.fullPath
-      ElMessage.warning('请先登录')
-      next(`/login?redirect=${encodeURIComponent(redirect)}`)
+      sessionStorage.setItem('redirect_after_login', redirect)
+      // 直接跳转到Keycloak登录页
+      authStore.redirectToLogin()
       return
     }
 
     // 检查权限
     if (to.meta.permission && !authStore.hasPermission(to.meta.permission as string)) {
       ElMessage.error('没有权限访问该页面')
-      next('/')
-      return
-    }
-  } else {
-    // 如果已登录且访问登录页，重定向到首页
-    if (authStore.isAuthenticated && to.path === '/login') {
       next('/')
       return
     }

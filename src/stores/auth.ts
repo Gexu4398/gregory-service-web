@@ -1,203 +1,199 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import Cookies from 'js-cookie'
+import { exchangeCodeForToken, getAuthUrl, refreshToken, validateState } from '@/api/auth'
 import { ElMessage } from 'element-plus'
-import * as authApi from '@/api/auth'
-import type { User, TokenInfo } from '@/types'
+import type { User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  // 状态
+  const token = ref<string>('')
+  const refreshTokenValue = ref<string>('')
   const user = ref<User | null>(null)
-  const token = ref<string | null>(null)
-  const refreshTokenValue = ref<string | null>(null)
-  const isLoading = ref(false)
+  const permissions = ref<string[]>([])
+  const roles = ref<string[]>([])
 
   // 计算属性
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
-  const userRoles = computed(() => user.value?.role?.map(r => r.name) || [])
-  const userPermissions = computed(() => {
-    const scopes: string[] = []
-    user.value?.role?.forEach(role => {
-      if (role.scopes) {
-        scopes.push(...role.scopes)
-      }
-    })
-    return [...new Set(scopes)] // 去重
-  })
+  const isAuthenticated = computed(() => !!token.value)
 
-  // 初始化认证状态
-  const initAuth = async () => {
-    const savedToken = Cookies.get('access_token')
-    const savedRefreshToken = Cookies.get('refresh_token')
-    
-    if (savedToken && savedRefreshToken) {
+  // 初始化，从localStorage恢复状态
+  const initializeAuth = async () => {
+    const savedToken = localStorage.getItem('auth_token')
+    const savedRefreshToken = localStorage.getItem('refresh_token')
+    const savedUser = localStorage.getItem('user_info')
+    const savedPermissions = localStorage.getItem('user_permissions')
+    const savedRoles = localStorage.getItem('user_roles')
+
+    if (savedToken) {
       token.value = savedToken
-      refreshTokenValue.value = savedRefreshToken
-      try {
-        await getCurrentUser()
-      } catch (error) {
-        // token 可能已过期，尝试刷新
-        await tryRefreshToken()
+      refreshTokenValue.value = savedRefreshToken || ''
+      
+      if (savedUser) {
+        user.value = JSON.parse(savedUser)
+      }
+      if (savedPermissions) {
+        permissions.value = JSON.parse(savedPermissions)
+      }
+      if (savedRoles) {
+        roles.value = JSON.parse(savedRoles)
       }
     }
   }
 
-  // 重定向到 Keycloak 登录页
+  // 跳转到Keycloak登录页
   const redirectToLogin = () => {
-    const authUrl = authApi.getAuthUrl()
+    const state = generateState()
+    sessionStorage.setItem('oauth_state', state)
+    const authUrl = getAuthUrl(state)
     window.location.href = authUrl
   }
 
-  // 处理授权码回调
+  // 处理OAuth回调
   const handleAuthCallback = async (code: string, state: string) => {
     try {
-      isLoading.value = true
-      
-      // 验证 state 参数
-      if (!authApi.validateState(state)) {
-        throw new Error('无效的 state 参数')
+      // 验证state参数
+      if (!validateState(state)) {
+        throw new Error('无效的state参数')
       }
+
+      const tokenData = await exchangeCodeForToken(code)
       
-      // 使用授权码换取 token
-      const tokenInfo = await authApi.exchangeCodeForToken(code)
+      // 保存认证信息
+      setAuthData(tokenData)
       
-      // 保存 token
-      token.value = tokenInfo.access_token
-      refreshTokenValue.value = tokenInfo.refresh_token
-      
-      // 保存到 Cookie
-      Cookies.set('access_token', tokenInfo.access_token, { expires: tokenInfo.expires_in / 86400 })
-      Cookies.set('refresh_token', tokenInfo.refresh_token, { expires: 7 }) // 7天
-      
-      // 获取用户信息
-      await getCurrentUser()
+      // 解析JWT获取用户信息
+      parseTokenData(tokenData.access_token)
       
       ElMessage.success('登录成功')
-      return true
-    } catch (error: any) {
-      ElMessage.error(error.message || '登录失败')
-      return false
-    } finally {
-      isLoading.value = false
+      
+      // 获取重定向路径
+      const redirect = sessionStorage.getItem('redirect_after_login') || '/'
+      sessionStorage.removeItem('redirect_after_login')
+      
+      return redirect
+    } catch (error) {
+      console.error('认证回调处理失败:', error)
+      ElMessage.error('登录失败，请重试')
+      throw error
+    }
+  }
+
+  // 解析JWT token获取用户信息和权限
+  const parseTokenData = (accessToken: string) => {
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]))
+      
+      // 设置用户信息
+      const userInfo: User = {
+        id: payload.sub,
+        username: payload.preferred_username || payload.username,
+        email: payload.email,
+        firstName: payload.given_name || '',
+        lastName: payload.family_name || '',
+        emailVerified: payload.email_verified || false,
+        enabled: true,
+        groups: payload.groups || [],
+        roles: payload.realm_access?.roles || [],
+        attributes: {}
+      }
+      
+      user.value = userInfo
+      roles.value = userInfo.roles
+      permissions.value = payload.scope ? payload.scope.split(' ') : []
+      
+      // 保存到localStorage
+      localStorage.setItem('user_info', JSON.stringify(userInfo))
+      localStorage.setItem('user_permissions', JSON.stringify(permissions.value))
+      localStorage.setItem('user_roles', JSON.stringify(roles.value))
+    } catch (error) {
+      console.error('解析token失败:', error)
+    }
+  }
+
+  // 设置认证数据
+  const setAuthData = (tokenData: any) => {
+    token.value = tokenData.access_token
+    refreshTokenValue.value = tokenData.refresh_token || ''
+    
+    localStorage.setItem('auth_token', token.value)
+    if (refreshTokenValue.value) {
+      localStorage.setItem('refresh_token', refreshTokenValue.value)
+    }
+  }
+
+  // 刷新token
+  const refreshAuthToken = async () => {
+    try {
+      if (!refreshTokenValue.value) {
+        throw new Error('没有refresh token')
+      }
+      
+      const tokenData = await refreshToken(refreshTokenValue.value)
+      setAuthData(tokenData)
+      parseTokenData(tokenData.access_token)
+      
+      return tokenData.access_token
+    } catch (error) {
+      console.error('刷新token失败:', error)
+      logout()
+      throw error
     }
   }
 
   // 登出
-  const logout = async (redirectToKeycloak = false) => {
-    try {
-      if (refreshTokenValue.value) {
-        await authApi.logout(refreshTokenValue.value)
-      }
-    } catch (error) {
-      console.error('登出请求失败:', error)
-    } finally {
-      // 清除本地状态
-      user.value = null
-      token.value = null
-      refreshTokenValue.value = null
-      Cookies.remove('access_token')
-      Cookies.remove('refresh_token')
-      
-      if (redirectToKeycloak) {
-        // 重定向到 Keycloak 登出页面
-        const logoutUrl = authApi.getLogoutUrl(`${window.location.origin}/login`)
-        window.location.href = logoutUrl
-      } else {
-        ElMessage.success('已安全退出')
-      }
-    }
-  }
-
-  // 获取当前用户信息
-  const getCurrentUser = async () => {
-    try {
-      const userData = await authApi.getCurrentUser()
-      user.value = userData
-    } catch (error) {
-      throw error
-    }
-  }
-
-  // 刷新 token
-  const tryRefreshToken = async () => {
-    if (!refreshTokenValue.value) {
-      await logout()
-      return false
-    }
+  const logout = (redirectToKeycloak = false) => {
+    // 清除本地存储
+    token.value = ''
+    refreshTokenValue.value = ''
+    user.value = null
+    permissions.value = []
+    roles.value = []
     
-    try {
-      const tokenInfo = await authApi.refreshToken(refreshTokenValue.value)
-      
-      // 更新 token
-      token.value = tokenInfo.access_token
-      refreshTokenValue.value = tokenInfo.refresh_token
-      
-      // 更新 Cookie
-      Cookies.set('access_token', tokenInfo.access_token, { expires: tokenInfo.expires_in / 86400 })
-      Cookies.set('refresh_token', tokenInfo.refresh_token, { expires: 7 })
-      
-      // 获取用户信息
-      await getCurrentUser()
-      return true
-    } catch (error) {
-      await logout()
-      return false
-    }
-  }
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('user_info')
+    localStorage.removeItem('user_permissions')
+    localStorage.removeItem('user_roles')
+    sessionStorage.removeItem('oauth_state')
+    sessionStorage.removeItem('redirect_after_login')
 
-  // 更新用户信息
-  const updateUserInfo = async (userData: User) => {
-    try {
-      const updatedUser = await authApi.updateProfile(userData)
-      user.value = updatedUser
-      ElMessage.success('个人信息更新成功')
-    } catch (error: any) {
-      ElMessage.error(error.message || '更新失败')
-      throw error
-    }
-  }
-
-  // 修改密码
-  const changePassword = async (data: { originalPassword: string; password: string }) => {
-    try {
-      await authApi.changePassword(data)
-      ElMessage.success('密码修改成功')
-    } catch (error: any) {
-      ElMessage.error(error.message || '密码修改失败')
-      throw error
+    if (redirectToKeycloak) {
+      // 跳转到Keycloak登出页面
+      const keycloakLogoutUrl = `${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM}/protocol/openid-connect/logout?redirect_uri=${encodeURIComponent(window.location.origin)}`
+      window.location.href = keycloakLogoutUrl
+    } else {
+      // 重新跳转到登录
+      redirectToLogin()
     }
   }
 
   // 检查权限
-  const hasPermission = (permission: string) => {
-    return userPermissions.value.includes(permission)
+  const hasPermission = (permission: string): boolean => {
+    return permissions.value.includes(permission)
   }
 
   // 检查角色
-  const hasRole = (role: string) => {
-    return userRoles.value.includes(role)
+  const hasRole = (role: string): boolean => {
+    return roles.value.includes(role)
+  }
+
+  // 生成随机state
+  const generateState = (): string => {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
   }
 
   return {
     // 状态
-    user,
     token,
-    isLoading,
-    
-    // 计算属性
+    user,
+    permissions,
+    roles,
     isAuthenticated,
-    userRoles,
-    userPermissions,
     
     // 方法
-    initAuth,
+    initializeAuth,
     redirectToLogin,
     handleAuthCallback,
+    refreshAuthToken,
     logout,
-    getCurrentUser,
-    tryRefreshToken,
-    updateUserInfo,
-    changePassword,
     hasPermission,
     hasRole,
   }

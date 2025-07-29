@@ -129,10 +129,10 @@
           <!-- 用户菜单 -->
           <el-dropdown @command="handleUserCommand">
             <div class="user-avatar">
-              <el-avatar :src="authStore.user?.picture" :size="32">
-                {{ authStore.user?.name?.charAt(0) }}
+              <el-avatar :size="32">
+                {{ (authStore.user?.firstName || authStore.user?.username || 'U').charAt(0).toUpperCase() }}
               </el-avatar>
-              <span class="username">{{ authStore.user?.name }}</span>
+              <span class="username">{{ authStore.user?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </div>
             
@@ -229,12 +229,10 @@ const handleUserCommand = (command: string) => {
       router.push('/profile')
       break
     case 'changePassword':
-      // TODO: 打开修改密码弹窗
+      router.push('/reset-password')
       break
     case 'logout':
-      authStore.logout().then(() => {
-        router.push('/login')
-      })
+      authStore.logout(true) // 重定向到Keycloak登出页面
       break
   }
 }
