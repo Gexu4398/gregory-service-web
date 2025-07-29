@@ -78,12 +78,48 @@ const router = createRouter({
           },
         },
         {
+          path: '/groups/create',
+          name: 'CreateGroup',
+          component: () => import('@/views/group/CreateGroup.vue'),
+          meta: {
+            title: '新建用户组',
+            permission: 'group:crud',
+          },
+        },
+        {
+          path: '/groups/:id/edit',
+          name: 'EditGroup',
+          component: () => import('@/views/group/EditGroup.vue'),
+          meta: {
+            title: '编辑用户组',
+            permission: 'group:crud',
+          },
+        },
+        {
           path: '/roles',
           name: 'RoleManagement',
           component: () => import('@/views/role/RoleList.vue'),
           meta: {
             title: '角色管理',
             icon: 'Avatar',
+            permission: 'role:crud',
+          },
+        },
+        {
+          path: '/roles/create',
+          name: 'CreateRole',
+          component: () => import('@/views/role/CreateRole.vue'),
+          meta: {
+            title: '新建角色',
+            permission: 'role:crud',
+          },
+        },
+        {
+          path: '/roles/:id/edit',
+          name: 'EditRole',
+          component: () => import('@/views/role/EditRole.vue'),
+          meta: {
+            title: '编辑角色',
             permission: 'role:crud',
           },
         },
@@ -104,6 +140,14 @@ const router = createRouter({
           meta: {
             title: '个人资料',
             icon: 'Setting',
+          },
+        },
+        {
+          path: '/reset-password',
+          name: 'ResetPassword',
+          component: () => import('@/views/ResetPassword.vue'),
+          meta: {
+            title: '修改密码',
           },
         },
       ],
