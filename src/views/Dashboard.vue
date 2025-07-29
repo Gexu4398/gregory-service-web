@@ -236,7 +236,7 @@ const loadStats = async () => {
     groupStats.value.count = groups.length
     
     // 加载最近日志
-    const logsData = await getLogs({ page: 0, size: 5, sort: ['createdAt,desc'] })
+    const logsData = await getLogs({ page: 0, size: 5, sort: 'createdAt,desc' })
     recentLogs.value = logsData.content
     
   } catch (error) {

@@ -158,7 +158,7 @@ export interface UserQueryParams {
   status?: string[]
   page?: number
   size?: number
-  sort?: string[]
+  sort?: string
 }
 
 export interface LogQueryParams {
@@ -171,5 +171,5 @@ export interface LogQueryParams {
   toDate?: string
   page?: number
   size?: number
-  sort?: string[]
+  sort?: string
 } 
