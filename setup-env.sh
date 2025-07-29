@@ -13,19 +13,19 @@ else
     echo "ℹ️  .env.example 文件已存在"
 fi
 
-# 创建 .env.development
+# 创建 ..env.development
 if [ ! -f ".env.development" ]; then
     echo "📝 创建 .env.development..."
-    cp env.development .env.development
+    cp .env.development ..env.development
     echo "✅ .env.development 文件已创建"
 else
     echo "ℹ️  .env.development 文件已存在"
 fi
 
-# 创建 .env.production
+# 创建 ..env.production
 if [ ! -f ".env.production" ]; then
     echo "📝 创建 .env.production..."
-    cp env.production .env.production
+    cp .env.production ..env.production
     echo "✅ .env.production 文件已创建"
 else
     echo "ℹ️  .env.production 文件已存在"
@@ -34,7 +34,7 @@ fi
 # 创建默认的 .env
 if [ ! -f ".env" ]; then
     echo "📝 创建默认 .env..."
-    cp env.development .env
+    cp .env.development .env
     echo "✅ .env 文件已创建（复制自开发环境配置）"
 else
     echo "ℹ️  .env 文件已存在"

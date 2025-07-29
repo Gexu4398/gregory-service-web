@@ -22,7 +22,7 @@ fi
 if [ ! -f ".env.development" ]; then
     echo "⚠️  .env.development 文件不存在，从示例文件复制..."
     if [ -f ".env.example" ]; then
-        cp .env.example .env.development
+        cp .env.example ..env.development
         echo "✅ 已创建 .env.development 文件，请根据需要修改配置"
     else
         echo "❌ .env.example 文件不存在"
@@ -32,9 +32,9 @@ fi
 
 # 显示配置信息
 echo "📋 当前配置："
-echo "   - API URL: $(grep VITE_API_URL .env.development | cut -d'=' -f2)"
-echo "   - Keycloak URL: $(grep VITE_KEYCLOAK_URL .env.development | cut -d'=' -f2)"
-echo "   - Keycloak Realm: $(grep VITE_KEYCLOAK_REALM .env.development | cut -d'=' -f2)"
+echo "   - API URL: $(grep VITE_API_URL ..env.development | cut -d'=' -f2)"
+echo "   - Keycloak URL: $(grep VITE_KEYCLOAK_URL ..env.development | cut -d'=' -f2)"
+echo "   - Keycloak Realm: $(grep VITE_KEYCLOAK_REALM ..env.development | cut -d'=' -f2)"
 
 # 启动开发服务器
 echo "🌐 启动开发服务器..."

@@ -7,7 +7,7 @@ export const getAuthUrl = (): string => {
     client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
     redirect_uri: `${window.location.origin}/auth/callback`,
     response_type: 'code',
-    scope: 'openid profile email',
+    scope: 'openid profile',
     state: generateState(),
   })
   

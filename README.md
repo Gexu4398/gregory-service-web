@@ -46,8 +46,8 @@ npm install
 ./setup-env.sh
 
 # 或者手动创建环境配置文件
-cp env.example .env.development
-cp env.development .env
+cp env.example ..env.development
+cp .env.development .env
 ```
 
 ### 3. 修改环境配置
